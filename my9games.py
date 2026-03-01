@@ -338,6 +338,17 @@ HTML = """<!DOCTYPE html>
       overflow: hidden;
       text-overflow: ellipsis;
       color: #f1f5f9;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid transparent;
+      outline: none;
+      width: 100%;
+      padding: 0;
+      font-family: inherit;
+    }
+    .slot-title:focus {
+      border-bottom-color: #475569;
+      white-space: normal;
     }
     textarea.slot-comment {
       width: 100%;
@@ -347,9 +358,10 @@ HTML = """<!DOCTYPE html>
       color: #94a3b8;
       font-family: inherit;
       font-size: 0.68rem;
-      resize: none;
+      resize: vertical;
       outline: none;
-      height: 34px;
+      height: 58px;
+      min-height: 34px;
       line-height: 1.45;
     }
     textarea.slot-comment::placeholder { color: #475569; }
@@ -606,9 +618,12 @@ function renderSlot(grid, i) {
     const body = document.createElement('div');
     body.className = 'slot-body';
 
-    const title = document.createElement('div');
+    const title = document.createElement('input');
+    title.type = 'text';
     title.className = 'slot-title';
-    title.textContent = g.name;
+    title.value = g.name;
+    title.title = 'クリックでタイトルを編集';
+    title.addEventListener('change', e => { state.games[i].name = e.target.value; save(); });
     body.appendChild(title);
 
     const ta = document.createElement('textarea');
@@ -734,8 +749,38 @@ function pickGame(g) {
 
 async function exportImage() {
   const target = document.getElementById('capture');
+  const swaps = [];
+
+  // ボタン類を非表示
   const toHide = [...target.querySelectorAll('.slot-actions')];
   toHide.forEach(el => { el.dataset.d = el.style.display; el.style.display = 'none'; });
+
+  // input.slot-title → div（折り返し表示）
+  target.querySelectorAll('input.slot-title').forEach(input => {
+    const div = document.createElement('div');
+    div.style.cssText = 'font-size:0.72rem;font-weight:bold;color:#f1f5f9;word-break:break-word;line-height:1.4;';
+    div.textContent = input.value;
+    input.parentNode.insertBefore(div, input);
+    input.style.display = 'none';
+    swaps.push({ el: input, proxy: div });
+  });
+
+  // textarea.slot-comment → div（全文表示）
+  target.querySelectorAll('textarea.slot-comment').forEach(ta => {
+    const div = document.createElement('div');
+    const spoiler = ta.classList.contains('spoiler');
+    div.style.cssText = [
+      'font-size:0.68rem', 'line-height:1.45', 'word-break:break-word', 'white-space:pre-wrap',
+      'border-bottom:1px solid #334155',
+      'color:' + (spoiler ? 'transparent' : '#94a3b8'),
+      spoiler ? 'text-shadow:0 0 7px #94a3b8' : '',
+    ].filter(Boolean).join(';');
+    div.textContent = ta.value;
+    ta.parentNode.insertBefore(div, ta);
+    ta.style.display = 'none';
+    swaps.push({ el: ta, proxy: div });
+  });
+
   try {
     const canvas = await html2canvas(target, { backgroundColor: '#0f172a', scale: 2, logging: false });
     const a = document.createElement('a');
@@ -746,6 +791,7 @@ async function exportImage() {
     alert('画像出力に失敗しました: ' + e.message);
   } finally {
     toHide.forEach(el => { el.style.display = el.dataset.d ?? ''; });
+    swaps.forEach(({ el, proxy }) => { proxy.remove(); el.style.display = ''; });
   }
 }
 
