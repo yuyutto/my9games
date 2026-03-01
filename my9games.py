@@ -5,18 +5,20 @@ Usage: python my9games.py
        → http://localhost:8080 を開く
 """
 import json
+import os
 import time
 import urllib.parse
 import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-PORT = 8080
+PORT = int(os.environ.get("PORT", 8080))
 
 # ---- IGDB 認証情報 ----
-# https://dev.twitch.tv/console でアプリを作成して取得（無料）
-IGDB_CLIENT_ID = ""
-IGDB_CLIENT_SECRET = ""
+# ローカル: このファイルに直接記入、または環境変数 IGDB_CLIENT_ID / IGDB_CLIENT_SECRET を設定
+# Railway等のクラウド: 環境変数として設定（https://dev.twitch.tv/console で取得）
+IGDB_CLIENT_ID = os.environ.get("IGDB_CLIENT_ID", "")
+IGDB_CLIENT_SECRET = os.environ.get("IGDB_CLIENT_SECRET", "")
 
 
 # ---- Steam API ----
@@ -93,7 +95,7 @@ def igdb_search(term):
     if not term.strip():
         return []
     if not IGDB_CLIENT_ID or not IGDB_CLIENT_SECRET:
-        return {"error": "IGDB_CLIENT_ID / IGDB_CLIENT_SECRET が未設定です。my9games.py の先頭に記入してください。"}
+        return {"error": "IGDB_CLIENT_ID / IGDB_CLIENT_SECRET が未設定です。環境変数として設定してください。"}
     token = get_igdb_token()
     escaped = term.replace('"', '\\"')
     body = f'fields name,cover.url; search "{escaped}"; limit 12;'.encode()
@@ -850,10 +852,13 @@ renderAll();
 
 
 if __name__ == "__main__":
-    server = HTTPServer(("localhost", PORT), Handler)
+    host = "0.0.0.0"
+    server = HTTPServer((host, PORT), Handler)
     url = f"http://localhost:{PORT}"
     print(f"起動中: {url}")
-    webbrowser.open(url)
+    # ローカル起動時のみブラウザを開く（PORT 環境変数が未設定 = ローカル）
+    if not os.environ.get("PORT"):
+        webbrowser.open(url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
